@@ -1,6 +1,7 @@
 // Floating AI Chat Assistant with Multilingual Voice Input & Speech Output
 // KRISHIFLOW-AI - Smart India Hackathon 2026 (Problem ID: SIH26032)
 
+import { useSpeechRecognition } from '../../hooks/useSpeechRecognition';
 import React, { useState, useRef, useEffect } from 'react';
 import { 
   Bot, X, Send, Mic, MicOff, Sparkles, User, RefreshCw, 
@@ -25,7 +26,6 @@ export const FloatingAiAssistant: React.FC = () => {
   const { t, i18n } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [inputText, setInputText] = useState('');
-  const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedLang, setSelectedLang] = useState<'auto' | 'hi' | 'or' | 'en'>('auto');
   const [speakingMsgId, setSpeakingMsgId] = useState<string | null>(null);
@@ -71,36 +71,14 @@ export const FloatingAiAssistant: React.FC = () => {
   const recognitionRef = useRef<any>(null);
 
   // Initialize Web Speech API with selected language
-  useEffect(() => {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-
-      let speechLang = 'en-IN';
-      if (selectedLang === 'hi') speechLang = 'hi-IN';
-      else if (selectedLang === 'or') speechLang = 'or-IN';
-      else if (selectedLang === 'en') speechLang = 'en-IN';
-      else {
-        speechLang = i18n.language === 'or' ? 'or-IN' : i18n.language === 'hi' ? 'hi-IN' : 'en-IN';
-      }
-      recognition.lang = speechLang;
-
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setInputText(transcript);
-        setIsListening(false);
-        handleSendMessage(transcript, true);
-      };
-
-      recognition.onerror = () => setIsListening(false);
-      recognition.onend = () => setIsListening(false);
-      recognitionRef.current = recognition;
-    }
-  }, [i18n.language, selectedLang]);
+  const { isListening, isSupported, voiceError, toggle: toggleVoiceInput } = useSpeechRecognition({
+  selectedLang,
+  uiLang: i18n.language,
+  onResult: (transcript) => {
+    setInputText(transcript);
+    handleSendMessage(transcript, true); // or handleSendMessage in the floating widget
+  },
+});
 
   useEffect(() => {
     if (isOpen) {
@@ -139,33 +117,6 @@ export const FloatingAiAssistant: React.FC = () => {
 
     setSpeakingMsgId(msgId);
     window.speechSynthesis.speak(utterance);
-  };
-
-  const toggleVoiceInput = () => {
-    if (!recognitionRef.current) {
-      alert('Speech recognition is not supported in this browser. Please use Chrome/Edge or type your question.');
-      return;
-    }
-
-    if (isListening) {
-      recognitionRef.current.stop();
-      setIsListening(false);
-    } else {
-      setIsListening(true);
-      try {
-        let speechLang = 'en-IN';
-        if (selectedLang === 'hi') speechLang = 'hi-IN';
-        else if (selectedLang === 'or') speechLang = 'or-IN';
-        else if (selectedLang === 'en') speechLang = 'en-IN';
-        else {
-          speechLang = i18n.language === 'or' ? 'or-IN' : i18n.language === 'hi' ? 'hi-IN' : 'en-IN';
-        }
-        recognitionRef.current.lang = speechLang;
-        recognitionRef.current.start();
-      } catch {
-        setIsListening(false);
-      }
-    }
   };
 
   const handleSendMessage = async (textToSend?: string, wasSpoken: boolean = false) => {
@@ -480,6 +431,9 @@ export const FloatingAiAssistant: React.FC = () => {
                 <Send className="w-4 h-4" />
               </button>
             </div>
+            {voiceError && (
+  <p className="text-[11px] text-rose-600 px-1">{voiceError}</p>
+)}
 
             <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
               <span>
