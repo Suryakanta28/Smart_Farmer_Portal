@@ -11,6 +11,7 @@ import { Navbar } from '../../components/common/Navbar';
 import { Footer } from '../../components/common/Footer';
 import { InteractiveMap } from '../../components/map/InteractiveMap';
 import { db, Society, ProcurementCentre, Farmer } from '../../lib/db';
+import { supabaseDb } from '../../lib/supabase';
 import { sendOtp, resendOtp, verifyOtpBackend, maskPhoneNumber } from '../../lib/otp';
 
 export const RegisterFarmer: React.FC = () => {
@@ -245,10 +246,9 @@ export const RegisterFarmer: React.FC = () => {
 
       setLoading(true);
 
-      // 1. Create user in users collection with their chosen password and mobile (Pending Manager Verification)
-      const users = db.getCollection('users');
+      // 1. Insert user into Supabase PostgreSQL users table (Pending Manager Verification, account_status = 'inactive')
       const newUserId = `usr-${Date.now()}`;
-      users.push({
+      await supabaseDb.insertUser({
         id: newUserId,
         role: 'farmer',
         name: formData.name.trim(),
@@ -256,17 +256,15 @@ export const RegisterFarmer: React.FC = () => {
         email: formData.email.trim() || `farmer_${Date.now()}@krishiflow.ai`,
         password: formData.password,
         approval_status: 'pending',
-        account_status: 'active',
+        account_status: 'inactive',
         society_id: formData.society_id,
         centre_id: formData.centre_id,
         created_at: new Date().toISOString(),
       });
-      db.setCollection('users', users);
 
-      // 2. Create farmer record with pending kyc
-      const farmers = db.getCollection<Farmer>('farmers');
+      // 2. Insert farmer record into Supabase PostgreSQL farmers table with pending KYC
       const newFarmerId = `far-${Date.now()}`;
-      farmers.push({
+      await supabaseDb.insertFarmer({
         id: newFarmerId,
         user_id: newUserId,
         name: formData.name.trim(),
@@ -275,7 +273,7 @@ export const RegisterFarmer: React.FC = () => {
         village: formData.village.trim(),
         district: formData.district.trim(),
         block: formData.block.trim(),
-        state: formData.state.trim(),
+        state: formData.state.trim() || 'Odisha',
         land_area_hectares: Number(formData.land_area_hectares) || 2.0,
         bank_account: formData.bank_account.trim(),
         ifsc_code: formData.ifsc.trim().toUpperCase(),
@@ -285,7 +283,6 @@ export const RegisterFarmer: React.FC = () => {
         longitude: 83.9812,
         created_at: new Date().toISOString(),
       });
-      db.setCollection('farmers', farmers);
 
       setLoading(false);
       navigate('/login', {

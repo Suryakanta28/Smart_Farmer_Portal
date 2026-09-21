@@ -8,6 +8,7 @@ import {
   X, Eye, UserCheck, RefreshCw, AlertCircle
 } from 'lucide-react';
 import { db, Farmer, User } from '../../lib/db';
+import { supabaseDb } from '../../lib/supabase';
 
 export const ManagerFarmersPage: React.FC = () => {
   const [farmers, setFarmers] = useState<Farmer[]>([]);
@@ -52,50 +53,31 @@ export const ManagerFarmersPage: React.FC = () => {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleUpdateKyc = (farmerId: string, newStatus: 'verified' | 'pending' | 'rejected') => {
-    const nowIso = new Date().toISOString();
-    const updatedFarmers = farmers.map((f) => {
-      if (f.id === farmerId) {
-        return { 
-          ...f, 
-          kyc_status: newStatus,
-          verified_at: newStatus === 'verified' ? nowIso : f.verified_at,
-          verified_by: newStatus === 'verified' ? 'State Procurement Administrator' : f.verified_by
-        };
-      }
-      return f;
-    });
-    db.setCollection('farmers', updatedFarmers);
-
-    // Synchronize linked user login credentials approval_status in users collection
+  const handleUpdateKyc = async (farmerId: string, newStatus: 'verified' | 'pending' | 'rejected' | 'revoked') => {
     const targetFarmer = farmers.find((f) => f.id === farmerId);
+    const approvalStatus = newStatus === 'verified' ? 'approved' : newStatus === 'rejected' ? 'rejected' : newStatus === 'revoked' ? 'revoked' : 'pending';
+    const accountStatus = newStatus === 'verified' ? 'active' : newStatus === 'revoked' ? 'revoked' : 'inactive';
+
     if (targetFarmer) {
       const allUsers = db.getCollection<User>('users');
-      const updatedUsers = allUsers.map((u) => {
-        if (
-          u.id === targetFarmer.user_id || 
-          (targetFarmer.alternate_contact_phone && u.phone === targetFarmer.alternate_contact_phone) || 
-          (u.role === 'farmer' && u.name.toLowerCase() === targetFarmer.name.toLowerCase())
-        ) {
-          const approvalStatus = newStatus === 'verified' ? 'approved' : newStatus === 'rejected' ? 'rejected' : 'pending';
-          const accountStatus = newStatus === 'rejected' ? 'suspended' : 'active';
-          return { 
-            ...u, 
-            approval_status: approvalStatus, 
-            account_status: accountStatus,
-            verified_at: newStatus === 'verified' ? nowIso : u.verified_at,
-            verified_by: newStatus === 'verified' ? 'State Procurement Administrator' : u.verified_by
-          };
-        }
-        return u;
-      });
-      db.setCollection('users', updatedUsers);
+      const targetUser = allUsers.find((u) => 
+        u.id === targetFarmer.user_id || 
+        (targetFarmer.alternate_contact_phone && u.phone === targetFarmer.alternate_contact_phone) || 
+        (u.role === 'farmer' && u.name.toLowerCase() === targetFarmer.name.toLowerCase())
+      );
+      if (targetUser) {
+        await supabaseDb.updateUserStatus(targetUser.id, approvalStatus, accountStatus, 'State Procurement Administrator');
+      }
     }
 
     if (selectedFarmer && selectedFarmer.id === farmerId) {
-      setSelectedFarmer({ ...selectedFarmer, kyc_status: newStatus });
+      const kycStatus = newStatus === 'verified' ? 'verified' : newStatus === 'pending' ? 'pending' : 'rejected';
+      setSelectedFarmer({ ...selectedFarmer, kyc_status: kycStatus });
     }
-    const label = newStatus === 'verified' ? 'VERIFIED & APPROVED (Login Enabled)' : newStatus === 'rejected' ? 'REVOKED / SUSPENDED (Login Blocked)' : 'PENDING VERIFICATION';
+    const label = 
+      newStatus === 'verified' ? 'VERIFIED & APPROVED (Login Enabled)' : 
+      newStatus === 'rejected' ? 'REJECTED (Login Blocked)' : 
+      newStatus === 'revoked' ? 'REVOKED / SUSPENDED (Login Blocked)' : 'PENDING VERIFICATION';
     showToast(`Farmer status updated to ${label}`);
   };
 
@@ -374,7 +356,7 @@ export const ManagerFarmersPage: React.FC = () => {
                           </button>
                         ) : (
                           <button
-                            onClick={() => handleUpdateKyc(f.id, 'rejected')}
+                            onClick={() => handleUpdateKyc(f.id, 'revoked')}
                             className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-[11px] transition-colors inline-flex items-center gap-1 cursor-pointer border border-rose-200"
                             title="Revoke & Suspend Access"
                           >
@@ -474,10 +456,10 @@ export const ManagerFarmersPage: React.FC = () => {
                     Approve KYC ✓
                   </button>
                   <button
-                    onClick={() => handleUpdateKyc(selectedFarmer.id, 'rejected')}
+                    onClick={() => handleUpdateKyc(selectedFarmer.id, 'revoked')}
                     className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-all shadow-sm"
                   >
-                    Reject
+                    Revoke / Suspend Access
                   </button>
                 </div>
               </div>

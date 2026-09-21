@@ -20,8 +20,8 @@ export interface User {
   password?: string;
   avatar_url?: string;
   designation?: string;
-  approval_status: 'pending' | 'approved' | 'rejected';
-  account_status: 'active' | 'suspended';
+  approval_status: 'pending' | 'approved' | 'rejected' | 'revoked';
+  account_status: 'inactive' | 'active' | 'suspended' | 'revoked';
   verified_at?: string;
   verified_by?: string;
   society_id?: string;
@@ -967,6 +967,29 @@ const SEED_ALERTS: AlertItem[] = [
 // REACTIVE STORAGE ENGINE & REALTIME EMITTER
 // -------------------------------------------------------------
 
+const memoryStore: Record<string, string> = {};
+const safeGetItem = (key: string): string | null => {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      return localStorage.getItem(key);
+    } catch {
+      return memoryStore[key] || null;
+    }
+  }
+  return memoryStore[key] || null;
+};
+const safeSetItem = (key: string, value: string): void => {
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(key, value);
+    } catch {
+      memoryStore[key] = value;
+    }
+  } else {
+    memoryStore[key] = value;
+  }
+};
+
 class ReactiveDatabase {
   private subscribers: Map<string, Set<(data: any) => void>> = new Map();
 
@@ -996,8 +1019,8 @@ class ReactiveDatabase {
     ];
 
     for (const [key, initialData] of keys) {
-      if (!localStorage.getItem(`kf_${key}`)) {
-        localStorage.setItem(`kf_${key}`, JSON.stringify(initialData));
+      if (!safeGetItem(`kf_${key}`)) {
+        safeSetItem(`kf_${key}`, JSON.stringify(initialData));
       }
     }
 
@@ -1015,7 +1038,7 @@ class ReactiveDatabase {
         return true;
       });
       if (validFarmers.length !== existingFarmers.length) {
-        localStorage.setItem('kf_farmers', JSON.stringify(validFarmers));
+        safeSetItem('kf_farmers', JSON.stringify(validFarmers));
       }
     } catch {
       // Ignore in non-browser environments
@@ -1025,7 +1048,7 @@ class ReactiveDatabase {
   // Get raw collection
   public getCollection<T>(key: string): T[] {
     try {
-      const val = localStorage.getItem(`kf_${key}`);
+      const val = safeGetItem(`kf_${key}`);
       return val ? JSON.parse(val) : [];
     } catch {
       return [];
@@ -1034,7 +1057,7 @@ class ReactiveDatabase {
 
   // Save collection & broadcast
   public setCollection<T>(key: string, data: T[]) {
-    localStorage.setItem(`kf_${key}`, JSON.stringify(data));
+    safeSetItem(`kf_${key}`, JSON.stringify(data));
     this.emit(key, data);
   }
 

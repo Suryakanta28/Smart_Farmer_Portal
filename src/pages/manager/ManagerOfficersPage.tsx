@@ -8,6 +8,7 @@ import {
   Download, Eye, PhoneCall, Scale, Clock, TrendingUp, ShieldAlert
 } from 'lucide-react';
 import { db, User, ProcurementCentre } from '../../lib/db';
+import { supabaseDb } from '../../lib/supabase';
 
 export const ManagerOfficersPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -47,28 +48,18 @@ export const ManagerOfficersPage: React.FC = () => {
     return centres.find((c) => c.id === centreId) || centres[0] || null;
   };
 
-  const handleUpdateOfficerStatus = (userId: string, newApproval: 'approved' | 'pending' | 'rejected', newAccount: 'active' | 'suspended' = 'active') => {
-    const nowIso = new Date().toISOString();
-    const updated = users.map((u) => {
-      if (u.id === userId) {
-        return { 
-          ...u, 
-          approval_status: newApproval, 
-          account_status: newAccount,
-          verified_at: newApproval === 'approved' ? nowIso : u.verified_at,
-          verified_by: newApproval === 'approved' ? 'State Procurement Administrator' : u.verified_by
-        };
-      }
-      return u;
-    });
-    db.setCollection('users', updated);
+  const handleUpdateOfficerStatus = async (
+    userId: string, 
+    newApproval: 'approved' | 'pending' | 'rejected' | 'revoked', 
+    newAccount: 'inactive' | 'active' | 'suspended' | 'revoked' = 'active'
+  ) => {
+    await supabaseDb.updateUserStatus(userId, newApproval, newAccount, 'State Procurement Administrator');
+
     if (selectedOfficer && selectedOfficer.id === userId) {
       setSelectedOfficer({ 
         ...selectedOfficer, 
         approval_status: newApproval, 
         account_status: newAccount,
-        verified_at: newApproval === 'approved' ? nowIso : selectedOfficer.verified_at,
-        verified_by: newApproval === 'approved' ? 'State Procurement Administrator' : selectedOfficer.verified_by
       });
     }
     showToast(`Mandi Incharge status updated to ${newApproval.toUpperCase()}`);
@@ -378,9 +369,9 @@ export const ManagerOfficersPage: React.FC = () => {
                             </button>
                           ) : (
                             <button
-                              onClick={() => handleUpdateOfficerStatus(officer.id, 'rejected', 'suspended')}
+                              onClick={() => handleUpdateOfficerStatus(officer.id, 'revoked', 'revoked')}
                               className="px-2.5 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs transition-colors cursor-pointer border border-rose-200 inline-flex items-center gap-1"
-                              title="Revoke & Suspend Access"
+                              title="Revoke & Terminate Access"
                             >
                               <ShieldAlert className="w-3 h-3" />
                               <span>Revoke</span>
@@ -483,10 +474,10 @@ export const ManagerOfficersPage: React.FC = () => {
                     Authorize Mandi Incharge ✓
                   </button>
                   <button
-                    onClick={() => handleUpdateOfficerStatus(selectedOfficer.id, 'rejected', 'suspended')}
+                    onClick={() => handleUpdateOfficerStatus(selectedOfficer.id, 'revoked', 'revoked')}
                     className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-all shadow-sm cursor-pointer"
                   >
-                    Reject / Suspend
+                    Revoke / Block Access
                   </button>
                 </div>
               </div>

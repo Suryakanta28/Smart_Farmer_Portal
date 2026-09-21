@@ -10,6 +10,7 @@ import {
   Clock, Sprout, Shield
 } from 'lucide-react';
 import { db, ProcurementCentre, Vehicle, Farmer, User, UserRole } from '../../lib/db';
+import { supabaseDb } from '../../lib/supabase';
 import { useAuth } from '../../context/AuthContext';
 import L from 'leaflet';
 
@@ -52,54 +53,19 @@ export const ManagerDashboard: React.FC = () => {
     setTimeout(() => setToastMessage(null), 4000);
   };
 
-  const handleUpdateStatus = (
+  const handleUpdateStatus = async (
     userId: string, 
-    newApproval: 'approved' | 'pending' | 'rejected', 
-    newAccount: 'active' | 'suspended' = 'active'
+    newApproval: 'approved' | 'pending' | 'rejected' | 'revoked', 
+    newAccount: 'inactive' | 'active' | 'suspended' | 'revoked' = 'active'
   ) => {
-    const allUsers = db.getCollection<User>('users');
-    const targetUser = allUsers.find((u) => u.id === userId);
-    const nowIso = new Date().toISOString();
     const verifierName = user?.name || 'State Procurement Administrator';
-    
-    const updatedUsers = allUsers.map((u) => {
-      if (u.id === userId) {
-        return { 
-          ...u, 
-          approval_status: newApproval, 
-          account_status: newAccount,
-          verified_at: newApproval === 'approved' ? nowIso : u.verified_at,
-          verified_by: newApproval === 'approved' ? verifierName : u.verified_by
-        };
-      }
-      return u;
-    });
-    db.setCollection('users', updatedUsers);
+    await supabaseDb.updateUserStatus(userId, newApproval, newAccount, verifierName);
 
-    // If farmer, also update linked record in farmers collection
-    if (targetUser && targetUser.role === 'farmer') {
-      const allFarmers = db.getCollection<Farmer>('farmers');
-      const updatedFarmers = allFarmers.map((f) => {
-        if (
-          f.user_id === userId || 
-          f.alternate_contact_phone === targetUser.phone || 
-          f.name.toLowerCase() === targetUser.name.toLowerCase()
-        ) {
-          const kycStatus = newApproval === 'approved' ? 'verified' : newApproval === 'rejected' ? 'rejected' : 'pending';
-          return { 
-            ...f, 
-            kyc_status: kycStatus,
-            verified_at: newApproval === 'approved' ? nowIso : f.verified_at,
-            verified_by: newApproval === 'approved' ? verifierName : f.verified_by
-          };
-        }
-        return f;
-      });
-      db.setCollection('farmers', updatedFarmers);
-    }
-
-    const actionText = newApproval === 'approved' ? 'VERIFIED & APPROVED (Login Enabled)' : newApproval === 'rejected' ? 'REVOKED / SUSPENDED (Login Blocked)' : 'MARKED PENDING';
-    showToast(`User ${targetUser?.name || userId} status set to: ${actionText}`);
+    const actionText = 
+      newApproval === 'approved' ? 'VERIFIED & APPROVED (Login Enabled)' : 
+      newApproval === 'rejected' ? 'REJECTED (Login Blocked)' : 
+      newApproval === 'revoked' ? 'REVOKED (Login Blocked & Session Terminated)' : 'MARKED PENDING';
+    showToast(`User status updated: ${actionText}`);
   };
 
   // AI Generated Insights (from Edge Function generate-ai-insights)
@@ -574,19 +540,30 @@ export const ManagerDashboard: React.FC = () => {
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           {!isApproved ? (
-                            <button
-                              onClick={() => handleUpdateStatus(u.id, 'approved', 'active')}
-                              className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs inline-flex items-center gap-1"
-                              title="Verify & Authorize User Login"
-                            >
-                              <UserCheck className="w-3.5 h-3.5" />
-                              <span>Verify & Approve</span>
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleUpdateStatus(u.id, 'approved', 'active')}
+                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-xs inline-flex items-center gap-1"
+                                title="Verify & Authorize User Login"
+                              >
+                                <UserCheck className="w-3.5 h-3.5" />
+                                <span>Verify & Approve</span>
+                              </button>
+                              {u.approval_status === 'pending' && (
+                                <button
+                                  onClick={() => handleUpdateStatus(u.id, 'rejected', 'inactive')}
+                                  className="px-2.5 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-100 text-slate-700 hover:text-rose-700 font-bold text-xs transition-colors cursor-pointer border border-slate-200 inline-flex items-center gap-1"
+                                  title="Reject Registration"
+                                >
+                                  <span>Reject</span>
+                                </button>
+                              )}
+                            </>
                           ) : (
                             <button
-                              onClick={() => handleUpdateStatus(u.id, 'rejected', 'suspended')}
+                              onClick={() => handleUpdateStatus(u.id, 'revoked', 'revoked')}
                               className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition-colors cursor-pointer border border-rose-200 inline-flex items-center gap-1"
-                              title="Revoke and Block Login"
+                              title="Revoke and Terminate Session"
                             >
                               <ShieldAlert className="w-3.5 h-3.5" />
                               <span>Revoke Access</span>

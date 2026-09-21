@@ -26,11 +26,17 @@ export const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Auto-refresh: clear fields on visit/mount
+  // Auto-refresh: clear fields on visit/mount and check revocation alerts
   useEffect(() => {
     setIdentifier('');
     setPassword('');
-    setError('');
+    const revokedMsg = sessionStorage.getItem('kf_revocation_alert');
+    if (revokedMsg) {
+      setError(revokedMsg);
+      sessionStorage.removeItem('kf_revocation_alert');
+    } else {
+      setError('');
+    }
   }, [location.pathname]);
 
   const rolesConfig: { id: UserRole; title: string; subtitle: string; icon: React.FC<{ className?: string }> }[] = [

@@ -10,6 +10,7 @@ import {
 import { Navbar } from '../../components/common/Navbar';
 import { Footer } from '../../components/common/Footer';
 import { db, UserRole, Vehicle } from '../../lib/db';
+import { supabaseDb } from '../../lib/supabase';
 import { sendOtp, resendOtp, verifyOtpBackend, maskPhoneNumber } from '../../lib/otp';
 
 export const RegisterOfficer: React.FC = () => {
@@ -219,10 +220,9 @@ export const RegisterOfficer: React.FC = () => {
         return;
       }
 
-      // Insert user with password into users collection (Pending State Manager Verification)
-      const users = db.getCollection('users');
+      // Insert user with password into Supabase PostgreSQL users table (Pending Manager Verification, account_status = 'inactive')
       const newUserId = `usr-${Date.now()}`;
-      users.push({
+      await supabaseDb.insertUser({
         id: newUserId,
         role,
         name: name.trim(),
@@ -233,10 +233,9 @@ export const RegisterOfficer: React.FC = () => {
         society_id: role === 'society_officer' ? 'soc-sbp-03' : undefined,
         centre_id: role === 'procurement_officer' ? 'pc-sbp-03' : undefined,
         approval_status: 'pending',
-        account_status: 'active',
+        account_status: 'inactive',
         created_at: new Date().toISOString(),
       });
-      db.setCollection('users', users);
 
       // If Driver, register vehicle in vehicles table
       if (role === 'driver') {
