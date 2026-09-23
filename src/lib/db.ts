@@ -2,7 +2,7 @@
 // KRISHIFLOW-AI - Smart India Hackathon 2026 (Problem ID: SIH26032)
 // Supports all 18 tables with live reactivity, persistent state, and Supabase client integration
 
-import { supabase, isLiveSupabaseConfigured } from './supabase';
+import { supabase, isLiveSupabaseConfigured, isUUID, generateUUID } from './supabase';
 import { sendSms } from './sms';
 
 // -------------------------------------------------------------
@@ -297,13 +297,43 @@ export interface AuditLog {
   created_at: string;
 }
 
+export interface RegistrationRequest {
+  id: string;
+  full_name: string;
+  role: 'farmer' | 'society_officer' | 'procurement_officer' | 'driver';
+  mobile_number: string;
+  email?: string;
+  password?: string;
+  land_area_hectares?: number;
+  aadhaar_masked?: string;
+  village?: string;
+  district?: string;
+  block?: string;
+  state?: string;
+  bank_account?: string;
+  ifsc_code?: string;
+  society_id?: string;
+  centre_id?: string;
+  designation?: string;
+  vehicle_reg_no?: string;
+  details?: Record<string, any>;
+  status: 'pending' | 'approved' | 'rejected';
+  requested_at: string;
+  reviewed_by?: string;
+  reviewed_by_name?: string;
+  reviewed_at?: string;
+  rejection_reason?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 // -------------------------------------------------------------
 // INITIAL HIGH-QUALITY SEED DATA
 // -------------------------------------------------------------
 
 const SEED_SOCIETIES: Society[] = [
   {
-    id: 'soc-01',
+    id: '11111111-1111-1111-1111-111111111101',
     name: 'Nilokheri Primary Agri Cooperative',
     code: 'PACS-NIL-01',
     district: 'Karnal',
@@ -313,7 +343,7 @@ const SEED_SOCIETIES: Society[] = [
     created_at: new Date().toISOString(),
   },
   {
-    id: 'soc-02',
+    id: '11111111-1111-1111-1111-111111111102',
     name: 'Bargarh Farmer Welfare Society (Attabira)',
     code: 'PACS-BAR-02',
     district: 'Bargarh',
@@ -323,7 +353,7 @@ const SEED_SOCIETIES: Society[] = [
     created_at: new Date().toISOString(),
   },
   {
-    id: 'soc-03',
+    id: '11111111-1111-1111-1111-111111111103',
     name: 'Sambalpur Central PAC Society',
     code: 'PACS-SBP-03',
     district: 'Sambalpur',
@@ -333,7 +363,7 @@ const SEED_SOCIETIES: Society[] = [
     created_at: new Date().toISOString(),
   },
   {
-    id: 'soc-04',
+    id: '11111111-1111-1111-1111-111111111104',
     name: 'Cuttack Sadar Krishak Sahakari Samiti',
     code: 'PACS-CTC-04',
     district: 'Cuttack',
@@ -346,7 +376,7 @@ const SEED_SOCIETIES: Society[] = [
 
 const SEED_CENTRES: ProcurementCentre[] = [
   {
-    id: 'cen-01',
+    id: '22222222-2222-2222-2222-222222222201',
     name: 'Nilokheri Grain Procurement Mandi',
     code: 'PC-NIL-01',
     district: 'Karnal',
@@ -361,7 +391,7 @@ const SEED_CENTRES: ProcurementCentre[] = [
     created_at: new Date().toISOString(),
   },
   {
-    id: 'cen-02',
+    id: '22222222-2222-2222-2222-222222222202',
     name: 'Attabira Rice Procurement Complex',
     code: 'PC-ATT-02',
     district: 'Bargarh',
@@ -376,7 +406,7 @@ const SEED_CENTRES: ProcurementCentre[] = [
     created_at: new Date().toISOString(),
   },
   {
-    id: 'cen-03',
+    id: '22222222-2222-2222-2222-222222222203',
     name: 'Sambalpur Regulated Market Yard',
     code: 'PC-SBP-03',
     district: 'Sambalpur',
@@ -391,7 +421,7 @@ const SEED_CENTRES: ProcurementCentre[] = [
     created_at: new Date().toISOString(),
   },
   {
-    id: 'cen-04',
+    id: '22222222-2222-2222-2222-222222222204',
     name: 'Cuttack Central Mandi Complex',
     code: 'PC-CTC-04',
     district: 'Cuttack',
@@ -406,7 +436,7 @@ const SEED_CENTRES: ProcurementCentre[] = [
     created_at: new Date().toISOString(),
   },
   {
-    id: 'cen-05',
+    id: '22222222-2222-2222-2222-222222222205',
     name: 'Bhubaneswar Agri Warehouse Mandi',
     code: 'PC-BBS-05',
     district: 'Khurda',
@@ -424,10 +454,11 @@ const SEED_CENTRES: ProcurementCentre[] = [
 
 const SEED_VEHICLES: Vehicle[] = [
   {
-    id: 'veh-01',
+    id: '33333333-3333-3333-3333-333333333301',
     registration_number: 'OD-15-AB-1024',
     vehicle_type: 'Mini Truck (1.5T)',
     capacity_kg: 1500,
+    driver_user_id: '00000000-0000-0000-0000-000000000005',
     driver_name: 'Suresh Kumar Mohapatra',
     driver_phone: '+919876543210',
     status: 'available',
@@ -437,7 +468,7 @@ const SEED_VEHICLES: Vehicle[] = [
     created_at: new Date().toISOString(),
   },
   {
-    id: 'veh-02',
+    id: '33333333-3333-3333-3333-333333333302',
     registration_number: 'OD-17-CD-3456',
     vehicle_type: 'Tractor Trolley (3.5T)',
     capacity_kg: 3500,
@@ -450,7 +481,7 @@ const SEED_VEHICLES: Vehicle[] = [
     created_at: new Date().toISOString(),
   },
   {
-    id: 'veh-03',
+    id: '33333333-3333-3333-3333-333333333303',
     registration_number: 'HR-05-XY-7890',
     vehicle_type: 'Medium Truck (5.0T)',
     capacity_kg: 5000,
@@ -463,15 +494,15 @@ const SEED_VEHICLES: Vehicle[] = [
     created_at: new Date().toISOString(),
   },
   {
-    id: 'veh-04',
+    id: '33333333-3333-3333-3333-333333333304',
     registration_number: 'OD-02-KL-9988',
     vehicle_type: 'Tata Ace (1.2T)',
     capacity_kg: 1200,
     driver_name: 'Manoj Sahoo',
     driver_phone: '+919876543213',
     status: 'available',
-    latitude: 21.4720,
-    longitude: 83.9910,
+    latitude: 20.4600,
+    longitude: 85.8810,
     last_gps_update: new Date().toISOString(),
     created_at: new Date().toISOString(),
   },
@@ -964,37 +995,32 @@ const SEED_ALERTS: AlertItem[] = [
 ];
 
 // -------------------------------------------------------------
-// REACTIVE STORAGE ENGINE & REALTIME EMITTER
+// PURE RUNTIME REACTIVE ENGINE & LIVE SUPABASE SYNC (ZERO LOCALSTORAGE)
 // -------------------------------------------------------------
 
-const memoryStore: Record<string, string> = {};
-const safeGetItem = (key: string): string | null => {
+// Clear any stale localstorage keys from previous mock sessions
+try {
   if (typeof localStorage !== 'undefined') {
-    try {
-      return localStorage.getItem(key);
-    } catch {
-      return memoryStore[key] || null;
+    const keysToPurge: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith('kf_') || k.startsWith('krishiflow'))) {
+        keysToPurge.push(k);
+      }
     }
+    keysToPurge.forEach((k) => localStorage.removeItem(k));
   }
-  return memoryStore[key] || null;
-};
-const safeSetItem = (key: string, value: string): void => {
-  if (typeof localStorage !== 'undefined') {
-    try {
-      localStorage.setItem(key, value);
-    } catch {
-      memoryStore[key] = value;
-    }
-  } else {
-    memoryStore[key] = value;
-  }
-};
+} catch {}
+
+const runtimeMemoryStore = new Map<string, any[]>();
 
 class ReactiveDatabase {
   private subscribers: Map<string, Set<(data: any) => void>> = new Map();
 
   constructor() {
     this.initStorage();
+    this.syncFromSupabase();
+    this.initSupabaseRealtime();
     this.startGpsSimulation();
   }
 
@@ -1016,49 +1042,91 @@ class ReactiveDatabase {
       ['alerts', SEED_ALERTS],
       ['vehicle_requests', []],
       ['audit_logs', []],
+      ['registration_requests', []],
     ];
 
     for (const [key, initialData] of keys) {
-      if (!safeGetItem(`kf_${key}`)) {
-        safeSetItem(`kf_${key}`, JSON.stringify(initialData));
+      if (!runtimeMemoryStore.has(key)) {
+        runtimeMemoryStore.set(key, initialData);
       }
-    }
-
-    // Purge any non-farmer accounts (manager, officers, drivers) accidentally added to farmers collection
-    try {
-      const existingFarmers = this.getCollection<Farmer>('farmers');
-      const existingUsers = this.getCollection<User>('users');
-      const validFarmers = existingFarmers.filter((f) => {
-        if (f.id.includes('usr-manager') || f.user_id?.includes('usr-manager') || f.id.includes('usr-driver') || f.id.includes('usr-society') || f.id.includes('usr-procurement')) return false;
-        if (f.name.includes('Dr. Alok') || f.name.includes('IAS') || f.name.includes('State Procurement Commission')) return false;
-        if (f.user_id) {
-          const u = existingUsers.find((user) => user.id === f.user_id);
-          if (u && u.role !== 'farmer') return false;
-        }
-        return true;
-      });
-      if (validFarmers.length !== existingFarmers.length) {
-        safeSetItem('kf_farmers', JSON.stringify(validFarmers));
-      }
-    } catch {
-      // Ignore in non-browser environments
     }
   }
 
-  // Get raw collection
+  // Get in-memory collection (live updated from Supabase PostgreSQL)
   public getCollection<T>(key: string): T[] {
-    try {
-      const val = safeGetItem(`kf_${key}`);
-      return val ? JSON.parse(val) : [];
-    } catch {
-      return [];
+    return (runtimeMemoryStore.get(key) as T[]) || [];
+  }
+
+  // Save collection in runtime memory, broadcast, and persist
+  public setCollection<T>(key: string, data: T[]) {
+    runtimeMemoryStore.set(key, data);
+    this.emit(key, data);
+  }
+
+  // Sync all tables from live Supabase PostgreSQL
+  public async syncFromSupabase() {
+    if (!isLiveSupabaseConfigured()) return;
+    const tableMappings: [string, string][] = [
+      ['societies', 'societies'],
+      ['centres', 'procurement_centres'],
+      ['vehicles', 'vehicles'],
+      ['users', 'users'],
+      ['farmers', 'farmers'],
+      ['crops', 'crops'],
+      ['bookings', 'bookings'],
+      ['trips', 'trips'],
+      ['queue', 'queue'],
+      ['procurements', 'procurements'],
+      ['payments', 'payments'],
+      ['notifications', 'notifications'],
+      ['offline_farmers', 'offline_farmers'],
+      ['alerts', 'alerts'],
+      ['vehicle_requests', 'vehicle_requests'],
+      ['audit_logs', 'audit_logs'],
+      ['registration_requests', 'registration_requests'],
+    ];
+
+    for (const [memKey, tableName] of tableMappings) {
+      try {
+        const { data, error } = await supabase.from(tableName).select('*');
+        if (!error && data && data.length > 0) {
+          runtimeMemoryStore.set(memKey, data);
+          this.emit(memKey, data);
+        }
+      } catch (err) {
+        console.warn(`Supabase live fetch error for table ${tableName}:`, err);
+      }
     }
   }
 
-  // Save collection & broadcast
-  public setCollection<T>(key: string, data: T[]) {
-    safeSetItem(`kf_${key}`, JSON.stringify(data));
-    this.emit(key, data);
+  // Realtime Supabase PostgreSQL changes listener
+  private initSupabaseRealtime() {
+    if (!isLiveSupabaseConfigured()) return;
+    try {
+      supabase
+        .channel('public-postgres-realtime')
+        .on('postgres_changes', { event: '*', schema: 'public' }, (payload) => {
+          const tableName = payload.table;
+          const memKey = tableName === 'procurement_centres' ? 'centres' : tableName;
+          const currentList = this.getCollection<any>(memKey);
+          let updatedList = [...currentList];
+
+          if (payload.eventType === 'INSERT') {
+            const exists = updatedList.some((item) => item.id === payload.new.id);
+            if (!exists) updatedList.unshift(payload.new);
+          } else if (payload.eventType === 'UPDATE') {
+            updatedList = updatedList.map((item) => (item.id === payload.new.id ? { ...item, ...payload.new } : item));
+          } else if (payload.eventType === 'DELETE') {
+            updatedList = updatedList.filter((item) => item.id !== (payload.old as any).id);
+          }
+
+          runtimeMemoryStore.set(memKey, updatedList);
+          this.emit(memKey, updatedList);
+        })
+        .subscribe();
+    } catch (err) {
+      console.warn('Realtime Supabase subscription warning:', err);
+    }
   }
 
   // PubSub subscription matching Supabase channel semantics
@@ -1460,6 +1528,21 @@ class ReactiveDatabase {
       };
     }
 
+    // 4. Check in registration_requests collection
+    const regRequests = this.getCollection<RegistrationRequest>('registration_requests');
+    const matchedReq = regRequests.find((r) => {
+      const rPhoneDigits = (r.mobile_number || '').replace(/\D/g, '').slice(-10);
+      return rPhoneDigits === cleanDigits && r.status === 'pending';
+    });
+
+    if (matchedReq) {
+      const roleName = roleLabels[matchedReq.role] || matchedReq.role.toUpperCase();
+      return {
+        registered: true,
+        message: `Is mobile number (+91 ${cleanDigits}) se "${roleName}" (${matchedReq.full_name}) ka registration request pehle se PENDING hai. State Manager ke approval ka intezar karein.`,
+      };
+    }
+
     return { registered: false };
   }
 
@@ -1480,14 +1563,37 @@ class ReactiveDatabase {
   // Crops
   public addCrop(cropData: Omit<Crop, 'id' | 'created_at' | 'status'>): Crop {
     const crops = this.getCollection<Crop>('crops');
+    const validCropId = generateUUID();
+    const validFarmerId = isUUID(cropData.farmer_id) ? cropData.farmer_id : '44444444-4444-4444-4444-444444444401';
+
     const newCrop: Crop = {
       ...cropData,
-      id: `crop-${Date.now()}`,
+      id: validCropId,
+      farmer_id: validFarmerId,
       status: 'registered',
       created_at: new Date().toISOString(),
     };
     crops.unshift(newCrop);
     this.setCollection('crops', crops);
+
+    if (isLiveSupabaseConfigured()) {
+      try {
+        supabase.from('crops').insert([{
+          id: newCrop.id,
+          farmer_id: newCrop.farmer_id,
+          crop_type: newCrop.crop_type,
+          expected_quantity_kg: newCrop.expected_quantity_kg,
+          harvest_date: newCrop.harvest_date,
+          status: newCrop.status,
+          created_at: newCrop.created_at,
+        }]).then(({ error }) => {
+          if (error) console.warn('Supabase insert crop error:', error.message);
+        });
+      } catch (e) {
+        console.warn('Supabase insert crop error:', e);
+      }
+    }
+
     return newCrop;
   }
 
@@ -1497,6 +1603,17 @@ class ReactiveDatabase {
     if (idx === -1) return null;
     crops[idx] = { ...crops[idx], ...updates };
     this.setCollection('crops', crops);
+
+    if (isLiveSupabaseConfigured()) {
+      try {
+        supabase.from('crops').update(updates).eq('id', id).then(({ error }) => {
+          if (error) console.warn('Supabase update crop error:', error.message);
+        });
+      } catch (e) {
+        console.warn('Supabase update crop error:', e);
+      }
+    }
+
     return crops[idx];
   }
 
@@ -1504,6 +1621,17 @@ class ReactiveDatabase {
     const crops = this.getCollection<Crop>('crops');
     const filtered = crops.filter((c) => c.id !== id);
     this.setCollection('crops', filtered);
+
+    if (isLiveSupabaseConfigured()) {
+      try {
+        supabase.from('crops').delete().eq('id', id).then(({ error }) => {
+          if (error) console.warn('Supabase delete crop error:', error.message);
+        });
+      } catch (e) {
+        console.warn('Supabase delete crop error:', e);
+      }
+    }
+
     return true;
   }
 
@@ -1520,13 +1648,17 @@ class ReactiveDatabase {
     const bookings = this.getCollection<Booking>('bookings');
     const tokenNumber = 1000 + bookings.length + 1;
     const tokenCode = `KFA-${tokenNumber}`;
+    const validBookingId = generateUUID();
+    const validFarmerId = isUUID(params.farmer_id) ? params.farmer_id : '44444444-4444-4444-4444-444444444401';
+    const validCentreId = isUUID(params.centre_id) ? params.centre_id : '22222222-2222-2222-2222-222222222203';
+    const validCropId = params.crop_id && isUUID(params.crop_id) ? params.crop_id : null;
 
     const newBooking: Booking = {
-      id: `book-${Date.now()}`,
-      farmer_id: params.farmer_id,
-      centre_id: params.centre_id,
-      slot_id: `slot-${Date.now()}`,
-      crop_id: params.crop_id,
+      id: validBookingId,
+      farmer_id: validFarmerId,
+      centre_id: validCentreId,
+      slot_id: generateUUID(),
+      crop_id: validCropId || undefined,
       date: params.date,
       time_slot: params.time_slot,
       token_number: tokenNumber,
@@ -1539,11 +1671,33 @@ class ReactiveDatabase {
     bookings.unshift(newBooking);
     this.setCollection('bookings', bookings);
 
+    if (isLiveSupabaseConfigured()) {
+      try {
+        supabase.from('bookings').insert([{
+          id: newBooking.id,
+          farmer_id: newBooking.farmer_id,
+          centre_id: newBooking.centre_id,
+          crop_id: newBooking.crop_id || null,
+          date: newBooking.date,
+          time_slot: newBooking.time_slot,
+          token_number: newBooking.token_number,
+          token_code: newBooking.token_code,
+          transport_mode: newBooking.transport_mode,
+          status: newBooking.status,
+          created_at: newBooking.created_at,
+        }]).then(({ error }) => {
+          if (error) console.warn('Supabase booking insert error:', error.message);
+        });
+      } catch (e) {
+        console.warn('Supabase booking insert error:', e);
+      }
+    }
+
     // Add to Queue
     const queue = this.getCollection<QueueItem>('queue');
     const newQueueItem: QueueItem = {
-      id: `q-${Date.now()}`,
-      centre_id: params.centre_id,
+      id: generateUUID(),
+      centre_id: validCentreId,
       booking_id: newBooking.id,
       token_number: tokenNumber,
       token_code: tokenCode,
@@ -1554,6 +1708,25 @@ class ReactiveDatabase {
     };
     queue.push(newQueueItem);
     this.setCollection('queue', queue);
+
+    if (isLiveSupabaseConfigured()) {
+      try {
+        supabase.from('queue').insert([{
+          id: newQueueItem.id,
+          centre_id: newQueueItem.centre_id,
+          booking_id: newQueueItem.booking_id,
+          token_number: newQueueItem.token_number,
+          token_code: newQueueItem.token_code,
+          position: newQueueItem.position,
+          status: newQueueItem.status,
+          created_at: newQueueItem.created_at,
+        }]).then(({ error }) => {
+          if (error) console.warn('Supabase queue insert error:', error.message);
+        });
+      } catch (e) {
+        console.warn('Supabase queue insert error:', e);
+      }
+    }
 
     // Update Crop
     if (params.crop_id) {
@@ -1569,7 +1742,7 @@ class ReactiveDatabase {
 
     // Send Notification
     this.createNotification({
-      user_id: 'usr-farmer',
+      user_id: validFarmerId,
       title: 'Slot Booked (Self Transport)',
       message: `Your appointment for ${params.date} ${params.time_slot} is confirmed. Token: ${tokenCode}`,
       type: 'success',
@@ -1595,6 +1768,8 @@ class ReactiveDatabase {
   }): { vehicleRequest: VehicleRequest; assignedVehicle: Vehicle | null } {
     const requests = this.getCollection<VehicleRequest>('vehicle_requests');
     const vehicles = this.getCollection<Vehicle>('vehicles');
+    const validReqId = generateUUID();
+    const validFarmerId = isUUID(params.farmer_id) ? params.farmer_id : '44444444-4444-4444-4444-444444444401';
 
     // Auto assign nearest available vehicle with capacity
     const eligible = vehicles.filter(
@@ -1604,14 +1779,13 @@ class ReactiveDatabase {
     let assignedVehicle: Vehicle | null = null;
     if (eligible.length > 0) {
       assignedVehicle = eligible[0];
-      // Mark vehicle on_trip or assigned
       assignedVehicle.status = 'assigned';
       this.setCollection('vehicles', vehicles);
     }
 
     const newRequest: VehicleRequest = {
-      id: `vr-${Date.now()}`,
-      farmer_id: params.farmer_id,
+      id: validReqId,
+      farmer_id: validFarmerId,
       pickup_location: params.pickup_location,
       pickup_latitude: params.pickup_latitude,
       pickup_longitude: params.pickup_longitude,
@@ -1627,18 +1801,44 @@ class ReactiveDatabase {
     requests.unshift(newRequest);
     this.setCollection('vehicle_requests', requests);
 
+    if (isLiveSupabaseConfigured()) {
+      try {
+        const prefTimeFormatted = params.preferred_pickup_time.includes(':')
+          ? params.preferred_pickup_time.split(' ')[0]
+          : '07:30:00';
+
+        supabase.from('vehicle_requests').insert([{
+          id: newRequest.id,
+          farmer_id: newRequest.farmer_id,
+          pickup_location: newRequest.pickup_location,
+          pickup_latitude: newRequest.pickup_latitude,
+          pickup_longitude: newRequest.pickup_longitude,
+          crop_quantity_kg: newRequest.crop_quantity_kg,
+          preferred_pickup_time: prefTimeFormatted,
+          alternate_phone: newRequest.alternate_phone || null,
+          special_instructions: newRequest.special_instructions || null,
+          assigned_vehicle_id: newRequest.assigned_vehicle_id || null,
+          status: newRequest.status,
+          created_at: newRequest.created_at,
+        }]).then(({ error }) => {
+          if (error) console.warn('Supabase vehicle_requests insert error:', error.message);
+        });
+      } catch (e) {
+        console.warn('Supabase vehicle_requests insert error:', e);
+      }
+    }
+
     if (params.crop_id) {
       this.updateCrop(params.crop_id, { status: 'vehicle_requested' });
     }
 
     if (assignedVehicle) {
-      // Create trip record
       const trips = this.getCollection<Trip>('trips');
       const newTrip: Trip = {
-        id: `trip-${Date.now()}`,
+        id: generateUUID(),
         vehicle_id: assignedVehicle.id,
-        farmer_id: params.farmer_id,
-        centre_id: 'cen-03',
+        farmer_id: validFarmerId,
+        centre_id: '22222222-2222-2222-2222-222222222203',
         farmer_name: params.farmerName || 'Farmer Ramesh',
         farmer_phone: params.farmerPhone || '+919876543201',
         village: params.pickup_location,
@@ -1652,7 +1852,25 @@ class ReactiveDatabase {
       trips.unshift(newTrip);
       this.setCollection('trips', trips);
 
-      // SMS to driver & farmer
+      if (isLiveSupabaseConfigured()) {
+        try {
+          supabase.from('trips').insert([{
+            id: newTrip.id,
+            vehicle_id: newTrip.vehicle_id,
+            farmer_id: newTrip.farmer_id,
+            centre_id: newTrip.centre_id,
+            status: newTrip.status,
+            distance_km: newTrip.distance_km,
+            eta_minutes: newTrip.eta_minutes,
+            created_at: newTrip.created_at,
+          }]).then(({ error }) => {
+            if (error) console.warn('Supabase trips insert error:', error.message);
+          });
+        } catch (e) {
+          console.warn('Supabase trips insert error:', e);
+        }
+      }
+
       sendSms({
         phone: assignedVehicle.driver_phone,
         message: `Pickup assigned: ${params.farmerName || 'Farmer Ramesh'}, ${params.crop_quantity_kg}kg at ${params.preferred_pickup_time}. Location: ${params.pickup_location}. Open driver dashboard.`,
@@ -1665,9 +1883,8 @@ class ReactiveDatabase {
         type: 'transactional',
       });
 
-      // Notification
       this.createNotification({
-        user_id: 'usr-farmer',
+        user_id: validFarmerId,
         title: 'Vehicle Assigned!',
         message: `Driver ${assignedVehicle.driver_name} (${assignedVehicle.registration_number}) will arrive at ${params.preferred_pickup_time}.`,
         type: 'transport',
@@ -1678,7 +1895,7 @@ class ReactiveDatabase {
     return { vehicleRequest: newRequest, assignedVehicle };
   }
 
-  // Vehicle Transport Slot Booking (Step 5B)
+  // Vehicle Transport Slot Booking
   public confirmVehicleSlotBooking(params: {
     farmer_id: string;
     centre_id: string;
@@ -1699,13 +1916,17 @@ class ReactiveDatabase {
     const bookings = this.getCollection<Booking>('bookings');
     const tokenNumber = 1000 + bookings.length + 1;
     const tokenCode = `KFA-${tokenNumber}`;
+    const validBookingId = generateUUID();
+    const validFarmerId = isUUID(params.farmer_id) ? params.farmer_id : '44444444-4444-4444-4444-444444444401';
+    const validCentreId = isUUID(params.centre_id) ? params.centre_id : '22222222-2222-2222-2222-222222222203';
+    const validCropId = params.crop_id && isUUID(params.crop_id) ? params.crop_id : null;
 
     const newBooking: Booking = {
-      id: `book-${Date.now()}`,
-      farmer_id: params.farmer_id,
-      centre_id: params.centre_id,
-      slot_id: `slot-${Date.now()}`,
-      crop_id: params.crop_id,
+      id: validBookingId,
+      farmer_id: validFarmerId,
+      centre_id: validCentreId,
+      slot_id: generateUUID(),
+      crop_id: validCropId || undefined,
       date: params.date,
       time_slot: params.time_slot,
       token_number: tokenNumber,
@@ -1722,11 +1943,41 @@ class ReactiveDatabase {
     bookings.unshift(newBooking);
     this.setCollection('bookings', bookings);
 
+    if (isLiveSupabaseConfigured()) {
+      try {
+        const prefTime = params.preferred_pickup_time.includes(':')
+          ? params.preferred_pickup_time.split(' ')[0]
+          : '07:30:00';
+
+        supabase.from('bookings').insert([{
+          id: newBooking.id,
+          farmer_id: newBooking.farmer_id,
+          centre_id: newBooking.centre_id,
+          crop_id: newBooking.crop_id || null,
+          date: newBooking.date,
+          time_slot: newBooking.time_slot,
+          token_number: newBooking.token_number,
+          token_code: newBooking.token_code,
+          transport_mode: newBooking.transport_mode,
+          pickup_location: newBooking.pickup_location || null,
+          pickup_latitude: newBooking.pickup_latitude || null,
+          pickup_longitude: newBooking.pickup_longitude || null,
+          preferred_pickup_time: prefTime,
+          status: newBooking.status,
+          created_at: newBooking.created_at,
+        }]).then(({ error }) => {
+          if (error) console.warn('Supabase bookings insert error:', error.message);
+        });
+      } catch (e) {
+        console.warn('Supabase bookings insert error:', e);
+      }
+    }
+
     // Update queue
     const queue = this.getCollection<QueueItem>('queue');
-    queue.push({
-      id: `q-${Date.now()}`,
-      centre_id: params.centre_id,
+    const newQueueItem: QueueItem = {
+      id: generateUUID(),
+      centre_id: validCentreId,
       booking_id: newBooking.id,
       token_number: tokenNumber,
       token_code: tokenCode,
@@ -1734,8 +1985,28 @@ class ReactiveDatabase {
       position: queue.filter((q) => q.status === 'waiting').length + 1,
       status: 'waiting',
       created_at: new Date().toISOString(),
-    });
+    };
+    queue.push(newQueueItem);
     this.setCollection('queue', queue);
+
+    if (isLiveSupabaseConfigured()) {
+      try {
+        supabase.from('queue').insert([{
+          id: newQueueItem.id,
+          centre_id: newQueueItem.centre_id,
+          booking_id: newQueueItem.booking_id,
+          token_number: newQueueItem.token_number,
+          token_code: newQueueItem.token_code,
+          position: newQueueItem.position,
+          status: newQueueItem.status,
+          created_at: newQueueItem.created_at,
+        }]).then(({ error }) => {
+          if (error) console.warn('Supabase queue insert error:', error.message);
+        });
+      } catch (e) {
+        console.warn('Supabase queue insert error:', e);
+      }
+    }
 
     // Update crop
     if (params.crop_id) {
@@ -1762,15 +2033,22 @@ class ReactiveDatabase {
     return newBooking;
   }
 
-  // Offline Farmer Assistance (8 Steps)
+  // Offline Farmer Assistance
   public createOfflineFarmer(data: Omit<OfflineFarmer, 'id' | 'created_at'>): OfflineFarmer {
     const list = this.getCollection<OfflineFarmer>('offline_farmers');
     const tokenNumber = 1040 + list.length + 1;
     const tokenCode = `KFA-OF-${tokenNumber}`;
+    const validOfflineId = generateUUID();
+    const validOfficerId = isUUID(data.society_officer_id) ? data.society_officer_id : '00000000-0000-0000-0000-000000000003';
+    const validCentreId = isUUID(data.centre_id) ? data.centre_id : '22222222-2222-2222-2222-222222222203';
+    const validVehicleId = data.assigned_vehicle_id && isUUID(data.assigned_vehicle_id) ? data.assigned_vehicle_id : '33333333-3333-3333-3333-333333333301';
 
     const newOfflineFarmer: OfflineFarmer = {
       ...data,
-      id: `off-${Date.now()}`,
+      id: validOfflineId,
+      society_officer_id: validOfficerId,
+      centre_id: validCentreId,
+      assigned_vehicle_id: data.transport_choice === 'vehicle' ? validVehicleId : undefined,
       token_number: tokenNumber,
       token_code: tokenCode,
       status: data.transport_choice === 'vehicle' ? 'vehicle_assigned' : 'slot_booked',
@@ -1780,11 +2058,54 @@ class ReactiveDatabase {
     list.unshift(newOfflineFarmer);
     this.setCollection('offline_farmers', list);
 
+    if (isLiveSupabaseConfigured()) {
+      try {
+        const prefTime = newOfflineFarmer.preferred_pickup_time
+          ? (newOfflineFarmer.preferred_pickup_time.includes(':') ? newOfflineFarmer.preferred_pickup_time.split(' ')[0] : '07:30:00')
+          : null;
+
+        supabase.from('offline_farmers').insert([{
+          id: newOfflineFarmer.id,
+          society_officer_id: newOfflineFarmer.society_officer_id,
+          farmer_name: newOfflineFarmer.farmer_name,
+          father_husband_name: newOfflineFarmer.father_husband_name || null,
+          aadhaar_masked: newOfflineFarmer.aadhaar_masked,
+          village: newOfflineFarmer.village,
+          district: newOfflineFarmer.district,
+          block: newOfflineFarmer.block || null,
+          mobile_optional: newOfflineFarmer.mobile_optional || null,
+          alternate_contact_name: newOfflineFarmer.alternate_contact_name,
+          alternate_contact_phone: newOfflineFarmer.alternate_contact_phone,
+          land_area_hectares: newOfflineFarmer.land_area_hectares,
+          ifsc_code: newOfflineFarmer.ifsc_code,
+          crop_type: newOfflineFarmer.crop_type,
+          expected_quantity_kg: newOfflineFarmer.expected_quantity_kg,
+          harvest_date: newOfflineFarmer.harvest_date || null,
+          centre_id: newOfflineFarmer.centre_id,
+          transport_choice: newOfflineFarmer.transport_choice,
+          assigned_vehicle_id: newOfflineFarmer.assigned_vehicle_id || null,
+          pickup_location: newOfflineFarmer.pickup_location || null,
+          pickup_latitude: newOfflineFarmer.pickup_latitude || null,
+          pickup_longitude: newOfflineFarmer.pickup_longitude || null,
+          preferred_pickup_time: prefTime,
+          special_instructions: newOfflineFarmer.special_instructions || null,
+          token_number: newOfflineFarmer.token_number,
+          token_code: newOfflineFarmer.token_code,
+          status: newOfflineFarmer.status,
+          created_at: newOfflineFarmer.created_at,
+        }]).then(({ error }) => {
+          if (error) console.warn('Supabase offline_farmers insert error:', error.message);
+        });
+      } catch (e) {
+        console.warn('Supabase offline_farmers insert error:', e);
+      }
+    }
+
     // Also add to central queue
     const queue = this.getCollection<QueueItem>('queue');
-    queue.push({
-      id: `q-${Date.now()}`,
-      centre_id: data.centre_id,
+    const newQueueItem: QueueItem = {
+      id: generateUUID(),
+      centre_id: validCentreId,
       booking_id: newOfflineFarmer.id,
       token_number: tokenNumber,
       token_code: tokenCode,
@@ -1792,10 +2113,10 @@ class ReactiveDatabase {
       position: queue.filter((q) => q.status === 'waiting').length + 1,
       status: 'waiting',
       created_at: new Date().toISOString(),
-    });
+    };
+    queue.push(newQueueItem);
     this.setCollection('queue', queue);
 
-    // Send SMS to alternate contact
     sendSms({
       phone: data.alternate_contact_phone,
       message: `Slot booked for Farmer ${data.farmer_name}. Token: ${tokenCode}. Transport: ${data.transport_choice.toUpperCase()}. Report 15 mins early at Mandi.`,
@@ -1803,7 +2124,7 @@ class ReactiveDatabase {
     });
 
     this.createNotification({
-      user_id: 'usr-society',
+      user_id: validOfficerId,
       title: 'Offline Farmer Token Generated',
       message: `Generated Token ${tokenCode} for ${data.farmer_name}. Alternate SMS dispatched.`,
       type: 'success',

@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "db:push": "npx supabase db push --db-url \"postgresql://postgres:1a3dWSfWfOzONHUW@db.nxhereipnyjztqecdxkw.supabase.co:5432/postgres\"",
+    "db:verify": "node scratch/verify_all_tables.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
@@ -16,6 +18,7 @@
     "jspdf": "^3.0.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.16.0",
+    "pg": "^8.23.0",
     "qrcode": "^1.5.4",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

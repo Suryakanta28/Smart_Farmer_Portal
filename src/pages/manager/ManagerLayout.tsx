@@ -1,7 +1,7 @@
 // State Procurement Manager (IAS) Dashboard Shell
 // KRISHIFLOW-AI - Smart India Hackathon 2026 (Problem ID: SIH26032)
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { 
@@ -13,6 +13,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useLanguage, Language } from '../../context/LanguageContext';
 import { FloatingAiAssistant } from '../../components/common/FloatingAiAssistant';
+import { db, RegistrationRequest } from '../../lib/db';
+import { supabaseDb } from '../../lib/supabase';
 
 export const ManagerLayout: React.FC = () => {
   const { t } = useTranslation();
@@ -22,9 +24,31 @@ export const ManagerLayout: React.FC = () => {
   const { user, logout } = useAuth();
   const { unreadCount } = useNotifications();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState<number>(0);
+
+  useEffect(() => {
+    const updateCount = () => {
+      const requests = db.getCollection<RegistrationRequest>('registration_requests');
+      const pending = requests.filter((r) => r.status === 'pending').length;
+      setPendingApprovalsCount(pending);
+    };
+    updateCount();
+    supabaseDb.getRegistrationRequests('pending').then((list) => {
+      setPendingApprovalsCount(list.length);
+    });
+    const unsub = db.subscribe('table:registration_requests', updateCount);
+    return () => unsub();
+  }, []);
 
   const navItems = [
     { label: t('managerNav.dashboard', 'State Overview'), path: '/manager/dashboard', icon: Home },
+    { 
+      label: 'Pending Approvals', 
+      path: '/manager/pending-approvals', 
+      icon: UserCheck, 
+      badge: pendingApprovalsCount > 0 ? `${pendingApprovalsCount} New` : undefined,
+      badgeColor: 'bg-amber-500 text-white font-extrabold'
+    },
     { label: t('managerNav.aiInsights', 'AI Smart Insights'), path: '/manager/ai-insights', icon: Bot, badge: 'AI' },
     { label: t('managerNav.analytics', 'State Analytics'), path: '/manager/analytics', icon: BarChart3 },
     { label: t('managerNav.centres', 'Mandi Centres'), path: '/manager/centres', icon: Building2 },
@@ -90,7 +114,7 @@ export const ManagerLayout: React.FC = () => {
                   <span>{item.label}</span>
                 </div>
                 {item.badge && (
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold">
+                  <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold shadow-sm ${item.badgeColor || 'bg-purple-500/20 text-purple-300'}`}>
                     {item.badge}
                   </span>
                 )}

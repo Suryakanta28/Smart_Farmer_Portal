@@ -1,30 +1,40 @@
-// Officer / Society / Driver Registration Page with Custom Password Setup
-// FPP - Smart Farmer Procurement Platform
+// Officer / Society / Driver Registration Page with Custom Password Setup & Society Selection
+// FPP - Smart Farmer Procurement Platform (SIH 2026)
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { 
   ShieldCheck, UploadCloud, KeyRound, CheckCircle, ArrowLeft, 
-  AlertCircle, Lock, Eye, EyeOff, Phone, Mail, User, Truck, Building2 
+  AlertCircle, Lock, Eye, EyeOff, Phone, Mail, User, Truck, Building2,
+  Building, Landmark, MapPin, Check
 } from 'lucide-react';
 import { Navbar } from '../../components/common/Navbar';
 import { Footer } from '../../components/common/Footer';
-import { db, UserRole, Vehicle } from '../../lib/db';
-import { supabaseDb } from '../../lib/supabase';
+import { db, UserRole, Vehicle, Society, ProcurementCentre } from '../../lib/db';
+import { supabaseDb, resolveSocietyUUID, resolveCentreUUID } from '../../lib/supabase';
 import { sendOtp, resendOtp, verifyOtpBackend, maskPhoneNumber } from '../../lib/otp';
+
+type OfficerRole = 'society_officer' | 'procurement_officer' | 'driver';
 
 export const RegisterOfficer: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const initialRole = (searchParams.get('role') as UserRole) || 'society_officer';
+  const rawRole = searchParams.get('role');
+  const initialRole: OfficerRole = (rawRole === 'procurement_officer' || rawRole === 'driver') ? rawRole : 'society_officer';
 
-  const [role, setRole] = useState<UserRole>(initialRole);
+  const [role, setRole] = useState<OfficerRole>(initialRole);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [designation, setDesignation] = useState('');
   const [regNo, setRegNo] = useState('');
   const [docUploaded, setDocUploaded] = useState(false);
+
+  // Society & Mandi Centre Selection
+  const societies = db.getCollection<Society>('societies');
+  const centres = db.getCollection<ProcurementCentre>('centres');
+  const [selectedSocietyId, setSelectedSocietyId] = useState<string>(societies[0]?.id || '11111111-1111-1111-1111-111111111101');
+  const [selectedCentreId, setSelectedCentreId] = useState<string>(centres[0]?.id || '22222222-2222-2222-2222-222222222201');
 
   // Password State
   const [password, setPassword] = useState('');
@@ -58,6 +68,8 @@ export const RegisterOfficer: React.FC = () => {
     setDocUploaded(false);
     setOtpErrorMsg('');
     setOtpSuccessMsg('');
+    if (societies.length > 0) setSelectedSocietyId(societies[0].id);
+    if (centres.length > 0) setSelectedCentreId(centres[0].id);
   }, []);
 
   // 5-minute countdown
@@ -108,6 +120,16 @@ export const RegisterOfficer: React.FC = () => {
     const phoneCheck = db.isPhoneRegistered(phone);
     if (phoneCheck.registered) {
       setOtpErrorMsg(phoneCheck.message || 'This mobile number is already registered.');
+      return false;
+    }
+
+    if (role === 'society_officer' && !selectedSocietyId) {
+      setOtpErrorMsg('Please select your assigned PACS Society.');
+      return false;
+    }
+
+    if (role === 'procurement_officer' && !selectedCentreId) {
+      setOtpErrorMsg('Please select your assigned Mandi / Procurement Centre.');
       return false;
     }
 
@@ -220,45 +242,26 @@ export const RegisterOfficer: React.FC = () => {
         return;
       }
 
-      // Insert user with password into Supabase PostgreSQL users table (Pending Manager Verification, account_status = 'inactive')
-      const newUserId = `usr-${Date.now()}`;
-      await supabaseDb.insertUser({
-        id: newUserId,
+      // Submit registration request to Supabase registration_requests table (Status: pending)
+      const reqId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `req-off-${Date.now()}`;
+      await supabaseDb.submitRegistrationRequest({
+        id: reqId,
         role,
-        name: name.trim(),
-        phone: phone.trim(),
+        full_name: name.trim(),
+        mobile_number: phone.trim(),
         email: email.trim() || `${role}_${Date.now()}@krishiflow.ai`,
         password: password,
-        designation: designation.trim() || undefined,
-        society_id: role === 'society_officer' ? 'soc-sbp-03' : undefined,
-        centre_id: role === 'procurement_officer' ? 'pc-sbp-03' : undefined,
-        approval_status: 'pending',
-        account_status: 'inactive',
-        created_at: new Date().toISOString(),
+        designation: designation.trim() || (role === 'society_officer' ? 'PACS Officer / Incharge' : role === 'procurement_officer' ? 'Procurement Inspector' : 'Fleet Driver'),
+        society_id: role === 'society_officer' ? selectedSocietyId : undefined,
+        centre_id: role === 'procurement_officer' ? selectedCentreId : undefined,
+        vehicle_reg_no: role === 'driver' ? regNo || 'OD-15-AB-1024' : undefined,
+        status: 'pending',
+        requested_at: new Date().toISOString(),
       });
-
-      // If Driver, register vehicle in vehicles table
-      if (role === 'driver') {
-        const vehicles = db.getCollection<Vehicle>('vehicles');
-        vehicles.push({
-          id: `veh-${Date.now()}`,
-          registration_number: regNo || 'OD-15-AB-1024',
-          vehicle_type: 'Mini Truck (1.5T)',
-          capacity_kg: 1500,
-          driver_name: name.trim(),
-          driver_phone: phone.trim(),
-          status: 'available',
-          latitude: 21.4680,
-          longitude: 83.9780,
-          last_gps_update: new Date().toISOString(),
-          created_at: new Date().toISOString(),
-        });
-        db.setCollection('vehicles', vehicles);
-      }
 
       navigate('/login', {
         state: {
-          message: `✅ Registration submitted successfully for ${name}! Aapka registration State Manager ke verification ke liye submit ho gaya hai. Manager ke verify/approve karne ke baad aap login kar sakenge.`,
+          message: `✅ Aapka registration successful hai, State Manager approval ka wait kijiye.`,
         },
       });
     } catch (err: any) {
@@ -266,6 +269,9 @@ export const RegisterOfficer: React.FC = () => {
       setVerifyingOtp(false);
     }
   };
+
+  const selectedSociety = societies.find((s) => s.id === selectedSocietyId);
+  const selectedCentre = centres.find((c) => c.id === selectedCentreId);
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 font-sans">
@@ -280,24 +286,109 @@ export const RegisterOfficer: React.FC = () => {
             {role.replace('_', ' ')} Registration
           </h1>
           <p className="text-xs text-slate-500">
-            Create your login credentials with 2-Factor SMS Verification
+            Select your assigned jurisdiction and configure your login credentials with 2-Factor SMS Verification
           </p>
         </div>
 
         <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-xl border border-slate-200">
           <form onSubmit={handleSubmit} className="space-y-4 text-xs">
+            {/* Role Switcher */}
             <div>
-              <label className="font-bold text-slate-700 block mb-1">Official Role</label>
+              <label className="font-bold text-slate-700 block mb-1">Official Operational Role *</label>
               <select
                 value={role}
-                onChange={(e) => setRole(e.target.value as UserRole)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none font-semibold cursor-pointer"
+                onChange={(e) => setRole(e.target.value as OfficerRole)}
+                className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none font-semibold cursor-pointer text-slate-900"
               >
-                <option value="society_officer">Society Officer (PACS Incharge)</option>
+                <option value="society_officer">Society Officer (PACS Primary Cooperative)</option>
                 <option value="procurement_officer">Procurement Officer (Mandi Mandate)</option>
                 <option value="driver">Logistics Vehicle Driver</option>
               </select>
             </div>
+
+            {/* SOCIETY OFFICER: PACS SOCIETY SELECTION */}
+            {role === 'society_officer' && (
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50/70 p-4 rounded-2xl border-2 border-blue-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-extrabold text-blue-950 flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-blue-600" />
+                    <span>Select Assigned PACS Society Jurisdiction *</span>
+                  </label>
+                  <span className="text-[10px] font-extrabold uppercase bg-blue-600 text-white px-2 py-0.5 rounded-md">
+                    Mandatory
+                  </span>
+                </div>
+
+                <select
+                  required
+                  value={selectedSocietyId}
+                  onChange={(e) => setSelectedSocietyId(e.target.value)}
+                  className="w-full p-3 bg-white border border-blue-300 rounded-xl outline-none font-bold text-slate-900 focus:ring-2 focus:ring-blue-500 cursor-pointer shadow-sm text-xs"
+                >
+                  {societies.map((soc) => (
+                    <option key={soc.id} value={soc.id}>
+                      {soc.name} ({soc.code}) — {soc.block}, {soc.district}
+                    </option>
+                  ))}
+                </select>
+
+                {selectedSociety && (
+                  <div className="bg-white/90 p-2.5 rounded-xl border border-blue-100 flex items-start gap-2 text-[11px] text-blue-900">
+                    <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">{selectedSociety.name}</span>
+                      <span className="block text-slate-500">
+                        {selectedSociety.address || `${selectedSociety.block}, ${selectedSociety.district}, Odisha`} • Contact: {selectedSociety.contact_phone}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-[11px] text-blue-800 leading-relaxed">
+                  💡 <b>Jurisdiction Rule:</b> Jab aap ye society select karenge, is PACS society ke sabhi kisanon ke registration requests aapke <b>Society Officer Dashboard</b> par verify aur approve karne ke liye aayenge.
+                </p>
+              </div>
+            )}
+
+            {/* PROCUREMENT OFFICER: MANDI CENTRE SELECTION */}
+            {role === 'procurement_officer' && (
+              <div className="bg-gradient-to-br from-teal-50 to-emerald-50/70 p-4 rounded-2xl border-2 border-teal-200 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-extrabold text-teal-950 flex items-center gap-2">
+                    <Building className="w-4 h-4 text-teal-600" />
+                    <span>Select Assigned Mandi / Procurement Yard Jurisdiction *</span>
+                  </label>
+                  <span className="text-[10px] font-extrabold uppercase bg-teal-600 text-white px-2 py-0.5 rounded-md">
+                    Mandatory
+                  </span>
+                </div>
+
+                <select
+                  required
+                  value={selectedCentreId}
+                  onChange={(e) => setSelectedCentreId(e.target.value)}
+                  className="w-full p-3 bg-white border border-teal-300 rounded-xl outline-none font-bold text-slate-900 focus:ring-2 focus:ring-teal-500 cursor-pointer shadow-sm text-xs"
+                >
+                  {centres.map((cen) => (
+                    <option key={cen.id} value={cen.id}>
+                      {cen.name} ({cen.code}) — {cen.district} (Cap: {cen.capacity_tonnes_per_day}T/day)
+                    </option>
+                  ))}
+                </select>
+
+                {selectedCentre && (
+                  <div className="bg-white/90 p-2.5 rounded-xl border border-teal-100 flex items-start gap-2 text-[11px] text-teal-900">
+                    <MapPin className="w-3.5 h-3.5 text-teal-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">{selectedCentre.name}</span>
+                      <span className="block text-slate-500">
+                        {selectedCentre.address} • Operating: {selectedCentre.operating_hours}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
@@ -307,7 +398,7 @@ export const RegisterOfficer: React.FC = () => {
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g. Anil Kumar Patra"
+                  placeholder="e.g. Subhashree Barik"
                   className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -337,7 +428,7 @@ export const RegisterOfficer: React.FC = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. officer.dept@fpp.gov.in"
+                  placeholder="e.g. officer.sambalpur@fpp.gov.in"
                   className="w-full pl-9 pr-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
@@ -345,7 +436,7 @@ export const RegisterOfficer: React.FC = () => {
 
             {role === 'driver' ? (
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Vehicle Registration / DL Number *</label>
+                <label className="font-bold text-slate-700 block mb-1">Vehicle Registration / Commercial DL Number *</label>
                 <input
                   type="text"
                   required
@@ -357,13 +448,13 @@ export const RegisterOfficer: React.FC = () => {
               </div>
             ) : (
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Designation & Department *</label>
+                <label className="font-bold text-slate-700 block mb-1">Official Designation *</label>
                 <input
                   type="text"
                   required
                   value={designation}
                   onChange={(e) => setDesignation(e.target.value)}
-                  placeholder="e.g. Field Officer / PACS Secretary"
+                  placeholder={role === 'society_officer' ? 'e.g. PACS Secretary / Field Incharge' : 'e.g. Quality Inspector / Yard Officer'}
                   className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>

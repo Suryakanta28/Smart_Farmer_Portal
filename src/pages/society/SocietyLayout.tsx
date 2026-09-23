@@ -1,7 +1,7 @@
 // Society Officer Dashboard Layout Shell
 // KRISHIFLOW-AI - Smart India Hackathon 2026 (Problem ID: SIH26032)
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { 
@@ -12,6 +12,8 @@ import { useAuth } from '../../context/AuthContext';
 import { useNotifications } from '../../context/NotificationContext';
 import { useLanguage, Language } from '../../context/LanguageContext';
 import { FloatingAiAssistant } from '../../components/common/FloatingAiAssistant';
+import { supabaseDb, matchesSociety } from '../../lib/supabase';
+import { db } from '../../lib/db';
 
 export const SocietyLayout: React.FC = () => {
   const { t } = useTranslation();
@@ -21,11 +23,28 @@ export const SocietyLayout: React.FC = () => {
   const { user, logout } = useAuth();
   const { unreadCount } = useNotifications();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [pendingFarmerCount, setPendingFarmerCount] = useState<number>(0);
+
+  const officerSocietyId = user?.society_id || '11111111-1111-1111-1111-111111111101';
+
+  const loadPendingCount = async () => {
+    try {
+      const allReqs = await supabaseDb.getRegistrationRequests('pending');
+      const filtered = allReqs.filter((r) => r.role === 'farmer' && matchesSociety(r.society_id, officerSocietyId));
+      setPendingFarmerCount(filtered.length);
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadPendingCount();
+    const unsub = db.subscribe('table:registration_requests', loadPendingCount);
+    return () => unsub();
+  }, [user]);
 
   const navItems = [
     { label: t('societyNav.dashboard', 'Dashboard'), path: '/society/dashboard', icon: Home },
     { label: t('societyNav.offlineFarmers', 'Offline Farmers'), path: '/society/offline-farmers', icon: PhoneOff, badge: '8-Step PACS' },
-    { label: t('societyNav.registeredFarmers', 'Registered Farmers'), path: '/society/farmers', icon: Users },
+    { label: t('societyNav.registeredFarmers', 'Farmer Approvals & Roster'), path: '/society/farmers', icon: Users, count: pendingFarmerCount },
     { label: t('societyNav.cropRecords', 'Crop Records'), path: '/society/crops', icon: Sprout },
     { label: t('societyNav.procurementRequests', 'Procurement Requests'), path: '/society/requests', icon: ClipboardList },
     { label: t('societyNav.slotsTokens', 'Slots & Tokens'), path: '/society/slots-tokens', icon: Ticket },

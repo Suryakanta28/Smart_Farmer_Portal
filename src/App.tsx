@@ -62,6 +62,7 @@ import { ManagerFarmersPage } from './pages/manager/ManagerFarmersPage';
 import { ManagerSocietiesPage } from './pages/manager/ManagerSocietiesPage';
 import { ManagerOfficersPage } from './pages/manager/ManagerOfficersPage';
 import { ManagerCentresPage } from './pages/manager/ManagerCentresPage';
+import { ManagerPendingApprovalsPage } from './pages/manager/ManagerPendingApprovalsPage';
 import { ScrollToTop } from './components/common/ScrollToTop';
 
 export const App: React.FC = () => {
@@ -107,6 +108,7 @@ export const App: React.FC = () => {
                 <Route path="dashboard" element={<SocietyDashboard />} />
                 <Route path="offline-farmers" element={<OfflineFarmersPage />} />
                 <Route path="farmers" element={<FarmersListPage />} />
+                <Route path="approvals" element={<FarmersListPage />} />
                 <Route path="crops" element={<MyCrops />} />
                 <Route path="requests" element={<ProcurementFlow />} />
                 <Route path="slots-tokens" element={<SlotsTokensPage />} />
@@ -154,6 +156,7 @@ export const App: React.FC = () => {
               <Route path="/manager" element={<ManagerLayout />}>
                 <Route index element={<Navigate to="/manager/dashboard" replace />} />
                 <Route path="dashboard" element={<ManagerDashboard />} />
+                <Route path="pending-approvals" element={<ManagerPendingApprovalsPage />} />
                 <Route path="ai-insights" element={<ManagerAiInsightsPage />} />
                 <Route path="analytics" element={<ManagerAnalyticsPage />} />
                 <Route path="centres" element={<ManagerCentresPage />} />

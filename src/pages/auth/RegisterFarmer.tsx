@@ -246,29 +246,15 @@ export const RegisterFarmer: React.FC = () => {
 
       setLoading(true);
 
-      // 1. Insert user into Supabase PostgreSQL users table (Pending Manager Verification, account_status = 'inactive')
-      const newUserId = `usr-${Date.now()}`;
-      await supabaseDb.insertUser({
-        id: newUserId,
+      // Submit registration request to Supabase registration_requests table (Status: pending)
+      const reqId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `req-far-${Date.now()}`;
+      await supabaseDb.submitRegistrationRequest({
+        id: reqId,
         role: 'farmer',
-        name: formData.name.trim(),
-        phone: formData.mobile.trim(),
+        full_name: formData.name.trim(),
+        mobile_number: formData.mobile.trim(),
         email: formData.email.trim() || `farmer_${Date.now()}@krishiflow.ai`,
         password: formData.password,
-        approval_status: 'pending',
-        account_status: 'inactive',
-        society_id: formData.society_id,
-        centre_id: formData.centre_id,
-        created_at: new Date().toISOString(),
-      });
-
-      // 2. Insert farmer record into Supabase PostgreSQL farmers table with pending KYC
-      const newFarmerId = `far-${Date.now()}`;
-      await supabaseDb.insertFarmer({
-        id: newFarmerId,
-        user_id: newUserId,
-        name: formData.name.trim(),
-        father_husband_name: 'Resident Farmer',
         aadhaar_masked: formData.aadhaar.trim(),
         village: formData.village.trim(),
         district: formData.district.trim(),
@@ -277,17 +263,16 @@ export const RegisterFarmer: React.FC = () => {
         land_area_hectares: Number(formData.land_area_hectares) || 2.0,
         bank_account: formData.bank_account.trim(),
         ifsc_code: formData.ifsc.trim().toUpperCase(),
-        alternate_contact_phone: formData.mobile.trim(),
-        kyc_status: 'pending',
-        latitude: 21.4669,
-        longitude: 83.9812,
-        created_at: new Date().toISOString(),
+        society_id: formData.society_id,
+        centre_id: formData.centre_id,
+        status: 'pending',
+        requested_at: new Date().toISOString(),
       });
 
       setLoading(false);
       navigate('/login', {
         state: {
-          message: `✅ Registration submitted successfully for ${formData.name}! Aapka registration State Manager ke verification ke liye submit ho gaya hai. Manager ke verify/approve karne ke baad aap login kar sakenge.`,
+          message: `✅ Aapka registration successful hai, manager approval ka wait kijiye.`,
         },
       });
     } catch (err: any) {

@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Users, PhoneOff, ClipboardList, Truck, DollarSign, Plus, 
-  CheckCircle2, ArrowRight, Printer, AlertTriangle, ShieldCheck, MapPin 
+  CheckCircle2, ArrowRight, Printer, AlertTriangle, ShieldCheck, 
+  MapPin, Clock, ArrowUpRight, Sparkles 
 } from 'lucide-react';
-import { db, Farmer, OfflineFarmer, Vehicle, Payment } from '../../lib/db';
+import { db, Farmer, OfflineFarmer, Vehicle, Payment, RegistrationRequest } from '../../lib/db';
+import { supabaseDb, matchesSociety } from '../../lib/supabase';
 import { OfflineFarmerModal } from '../../components/offline/OfflineFarmerModal';
 import { generateTokenPdf } from '../../lib/pdf';
 import { useAuth } from '../../context/AuthContext';
@@ -14,22 +17,34 @@ export const SocietyDashboard: React.FC = () => {
   const [offlineFarmers, setOfflineFarmers] = useState<OfflineFarmer[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<RegistrationRequest[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const loadData = () => {
+  const officerSocietyId = user?.society_id || '11111111-1111-1111-1111-111111111101';
+
+  const loadData = async () => {
     setFarmers(db.getCollection<Farmer>('farmers'));
     setOfflineFarmers(db.getCollection<OfflineFarmer>('offline_farmers'));
     setVehicles(db.getCollection<Vehicle>('vehicles'));
     setPayments(db.getCollection<Payment>('payments'));
+
+    // Fetch live pending requests from Supabase
+    try {
+      const allReqs = await supabaseDb.getRegistrationRequests('pending');
+      const filtered = allReqs.filter((r) => r.role === 'farmer' && matchesSociety(r.society_id, officerSocietyId));
+      setPendingRequests(filtered);
+    } catch {}
   };
 
   useEffect(() => {
     loadData();
     const unsubOffline = db.subscribe('table:offline_farmers', loadData);
     const unsubFarmers = db.subscribe('table:farmers', loadData);
+    const unsubReq = db.subscribe('table:registration_requests', loadData);
     return () => {
       unsubOffline();
       unsubFarmers();
+      unsubReq();
     };
   }, []);
 
@@ -72,24 +87,80 @@ export const SocietyDashboard: React.FC = () => {
             Society Command Dashboard: {user?.name || 'PACS Officer'}
           </h1>
           <p className="text-xs sm:text-sm text-blue-100 max-w-2xl leading-relaxed">
-            Bridging the digital divide for rural farmers without smartphones. Issue official paper tokens, manage local vehicle allocation queues, and reconcile cooperative records.
+            Manage local PACS farmer enrollments, review pending registrations, assist offline walk-in farmers, and coordinate seamless mandi logistics.
           </p>
 
-          <div className="pt-2">
+          <div className="pt-2 flex flex-wrap items-center gap-3">
             <button
               onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/30 transition-all hover:scale-105"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-emerald-500/30 transition-all hover:scale-105"
             >
               <Plus className="w-4 h-4" />
               <span>+ Assist Offline Farmer (8-Step Wizard)</span>
             </button>
+            <Link
+              to="/society/farmers?tab=pending"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs shadow-lg shadow-amber-400/30 transition-all hover:scale-105"
+            >
+              <Clock className="w-4 h-4" />
+              <span>Review Farmer Registrations ({pendingRequests.length})</span>
+            </Link>
           </div>
         </div>
       </div>
 
+      {/* PENDING APPROVALS ALERT BANNER */}
+      {pendingRequests.length > 0 && (
+        <div className="bg-amber-500/10 border border-amber-300/80 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-in fade-in">
+          <div className="flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center font-bold shrink-0 shadow-md">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-extrabold text-amber-950 flex items-center gap-2">
+                <span>{pendingRequests.length} Farmer Registrations Awaiting PACS Approval</span>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-amber-500 text-slate-950">Action Required</span>
+              </h3>
+              <p className="text-xs text-amber-800 mt-0.5">
+                New online farmers selected your PACS society during registration. Approving them immediately activates their database account and enables login.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/society/farmers?tab=pending"
+            className="flex items-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-md shadow-amber-500/20 transition-all shrink-0"
+          >
+            <span>Review & Approve Now</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
+
       {/* Stats Cards (5 Columns Real-Time) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        {/* Card 1: Registered Farmers */}
+        {/* Card 1: Pending PACS Approvals */}
+        <div className="bg-white p-5 rounded-2xl border border-amber-200 shadow-sm relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider block">
+              Pending Approvals
+            </span>
+            {pendingRequests.length > 0 && (
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+            )}
+          </div>
+          <span className="text-2xl sm:text-3xl font-extrabold text-amber-600 mt-1 block">
+            {pendingRequests.length}
+          </span>
+          <Link
+            to="/society/farmers?tab=pending"
+            className="text-[10px] text-amber-700 font-bold hover:underline flex items-center gap-1 mt-0.5"
+          >
+            <span>Verify incoming farmers</span>
+            <ArrowUpRight className="w-3 h-3" />
+          </Link>
+        </div>
+
+        {/* Card 2: Registered Farmers */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
             Registered Farmers
@@ -102,7 +173,7 @@ export const SocietyDashboard: React.FC = () => {
           </span>
         </div>
 
-        {/* Card 2: Offline Assisted Farmers */}
+        {/* Card 3: Offline Assisted Farmers */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
             Offline Farmers
@@ -115,28 +186,15 @@ export const SocietyDashboard: React.FC = () => {
           </span>
         </div>
 
-        {/* Card 3: Procurement Requests */}
+        {/* Card 4: Logistics Vehicles */}
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
           <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-            Procurement Requests
+            Logistics Fleet
           </span>
-          <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1 block">
-            86
-          </span>
-          <span className="text-[10px] text-slate-500 font-semibold block mt-0.5">
-            Current Kharif season
-          </span>
-        </div>
-
-        {/* Card 4: Vehicles Active */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-            Logistics Vehicles
-          </span>
-          <span className="text-2xl sm:text-3xl font-extrabold text-amber-600 mt-1 block">
+          <span className="text-2xl sm:text-3xl font-extrabold text-indigo-600 mt-1 block">
             {vehicles.length + 12}
           </span>
-          <span className="text-[10px] text-amber-600 font-semibold block mt-0.5">
+          <span className="text-[10px] text-indigo-600 font-semibold block mt-0.5">
             Trolleys & trucks
           </span>
         </div>

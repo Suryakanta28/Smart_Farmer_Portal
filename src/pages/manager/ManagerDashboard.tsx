@@ -389,12 +389,20 @@ export const ManagerDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Role Filter */}
+          {/* Role Filter & Command Link */}
           <div className="flex items-center gap-2">
+            <Link
+              to="/manager/pending-approvals"
+              className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-bold shadow-md shadow-purple-600/20 transition-all flex items-center gap-1.5 shrink-0"
+            >
+              <UserCheck className="w-3.5 h-3.5" />
+              <span>Open Approval Command Center →</span>
+            </Link>
+
             <select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none cursor-pointer"
+              className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 outline-none cursor-pointer hidden md:block"
             >
               <option value="all">All Registered Roles</option>
               <option value="farmer">Farmers (Kisans)</option>

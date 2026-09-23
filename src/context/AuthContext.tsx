@@ -20,10 +20,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
-    // Only restore user session if user explicitly logged in during an active session
-    const isLoggedIn = localStorage.getItem('kf_is_logged_in');
+    // Purge any stale localStorage
+    try {
+      localStorage.removeItem('kf_current_user');
+      localStorage.removeItem('kf_is_logged_in');
+    } catch {}
+
+    const isLoggedIn = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('kf_is_logged_in') : null;
     if (isLoggedIn === 'true') {
-      const saved = localStorage.getItem('kf_current_user');
+      const saved = sessionStorage.getItem('kf_current_user');
       if (saved) {
         try {
           return JSON.parse(saved);
@@ -31,9 +36,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return null;
         }
       }
-    } else {
-      localStorage.removeItem('kf_current_user');
-      localStorage.removeItem('kf_is_logged_in');
     }
     return null;
   });
@@ -42,12 +44,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const isAuthenticated = !!user;
 
   useEffect(() => {
+    if (typeof sessionStorage === 'undefined') return;
     if (user) {
-      localStorage.setItem('kf_current_user', JSON.stringify(user));
-      localStorage.setItem('kf_is_logged_in', 'true');
+      sessionStorage.setItem('kf_current_user', JSON.stringify(user));
+      sessionStorage.setItem('kf_is_logged_in', 'true');
     } else {
-      localStorage.removeItem('kf_current_user');
-      localStorage.removeItem('kf_is_logged_in');
+      sessionStorage.removeItem('kf_current_user');
+      sessionStorage.removeItem('kf_is_logged_in');
     }
   }, [user]);
 
@@ -73,9 +76,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ) {
           console.warn(`[Security Guard] User ${match.name} status updated to ${match.approval_status}/${match.account_status}. Terminating session.`);
           setUser(null);
-          localStorage.removeItem('kf_current_user');
-          localStorage.removeItem('kf_is_logged_in');
-          sessionStorage.setItem('kf_revocation_alert', '🚫 Access Revoked: State Manager has revoked/suspended your access. You have been logged out.');
+          if (typeof sessionStorage !== 'undefined') {
+            sessionStorage.removeItem('kf_current_user');
+            sessionStorage.removeItem('kf_is_logged_in');
+            sessionStorage.setItem('kf_revocation_alert', '🚫 Access Revoked: State Manager has revoked/suspended your access. You have been logged out.');
+          }
           window.location.href = '/login';
           return;
         }
@@ -133,27 +138,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // STATE MANAGER APPROVAL & REVOCATION ACCESS GATE
+      // SOCIETY OFFICER & STATE MANAGER APPROVAL ACCESS GATE
       // Manager role is always permitted as system administrator
       if (matched.role !== 'manager') {
         if (matched.approval_status === 'pending' || matched.account_status === 'inactive') {
           return {
             success: false,
-            error: '⏳ Account Pending Verification: Aapka registration State Manager ke verification ke liye pending hai. Manager dwara verify/approve hone ke baad hi aap login kar sakte hain.'
+            error: '⏳ Aapka registration abhi PACS Society Officer / Manager approval ke liye pending hai. Approval milne ke baad hi aap login kar sakte hain.'
           };
         }
 
         if (matched.approval_status === 'rejected') {
+          const regReq = await supabaseDb.findRegistrationRequestByIdentifier(cleanId);
+          const reason = regReq?.rejection_reason ? `: ${regReq.rejection_reason}` : '';
           return {
             success: false,
-            error: '❌ Registration Rejected: Aapka account registration State Manager dwara reject kar diya gaya hai. Aap login nahi kar sakte.'
+            error: `❌ Aapka registration reject ho gaya hai${reason}`
           };
         }
 
         if (matched.approval_status === 'revoked' || matched.account_status === 'revoked' || matched.account_status === 'suspended') {
           return {
             success: false,
-            error: '🚫 Access Revoked: Aapka account registration State Manager dwara revoke/suspend kar diya gaya hai. Aap login nahi kar sakte.'
+            error: '🚫 Access Revoked: Aapka account registration PACS Society Officer / State Manager dwara revoke/suspend kar diya gaya hai. Aap login nahi kar sakte.'
           };
         }
 
@@ -169,6 +176,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: true, user: matched };
     }
 
+    // 3. If no active user found, check if there is a pending or rejected registration request
+    const pendingReq = await supabaseDb.findRegistrationRequestByIdentifier(cleanId);
+    if (pendingReq) {
+      if (pendingReq.status === 'pending') {
+        return {
+          success: false,
+          error: '⏳ Aapka registration abhi PACS Society Officer / Manager approval ke liye pending hai. Approval milne ke baad hi aap login kar sakte hain.'
+        };
+      }
+      if (pendingReq.status === 'rejected') {
+        const reason = pendingReq.rejection_reason ? `: ${pendingReq.rejection_reason}` : '';
+        return {
+          success: false,
+          error: `❌ Aapka registration reject ho gaya hai${reason}`
+        };
+      }
+    }
+
     return {
       success: false,
       error: 'No account found with this mobile number or email. Please register your account first.'
@@ -177,8 +202,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('kf_current_user');
-    localStorage.removeItem('kf_is_logged_in');
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.removeItem('kf_current_user');
+      sessionStorage.removeItem('kf_is_logged_in');
+    }
     if (isLiveSupabaseConfigured()) {
       supabase.auth.signOut().catch(() => {});
     }
@@ -237,7 +264,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return;
     const updated = { ...user, ...updates };
     setUser(updated);
-    localStorage.setItem('kf_current_user', JSON.stringify(updated));
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.setItem('kf_current_user', JSON.stringify(updated));
+    }
 
     const users = db.getCollection<User>('users');
     const idx = users.findIndex((u) => u.id === user.id || u.email === user.email);
